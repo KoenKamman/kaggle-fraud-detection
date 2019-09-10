@@ -71,3 +71,6 @@ test_df = reduce_mem_usage(test_df)
 
 train_df.to_pickle("./data/train_df.pkl")
 test_df.to_pickle("./data/test_df.pkl")
+del train_df, test_df
+
+#%%
