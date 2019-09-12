@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score, mean_squared_error
 from sklearn.model_selection import train_test_split
 
@@ -19,7 +19,12 @@ print("test_df", test_df.shape)
 
 #%%
 # These are the features we used. We had a 
-variables = ["addr1", "card4",  "card6", "R_emaildomain", "P_emaildomain", "M4",  "isFraud"]
+variables = [
+    'ProductCD', 'card1', 'card2', 'card3', 'card4', 'card5', 'card6',
+    'addr1', 'addr2', 'P_emaildomain', 'R_emaildomain', 'DeviceType', 'DeviceInfo', 'isFraud'
+] + [f'M{n}' for n in range(1, 10)] + [f'id_{n}' for n in range(12, 39)]
+
+# num_cols = list(set(train_df.columns) - set(variables))
 
 # We only want the datasets with these features in it
 sub_train_df = train_df[variables]
@@ -37,21 +42,8 @@ combined_df.head()
 
 
 #%%
-# We made columns for the missing/empty cells
-combined_df_missing = combined_df[variables].isnull().astype(int).add_suffix('_missing')
-
-# Concatenate the two new columns to the data frame
-combined_df = pd.concat([combined_df, combined_df_missing], axis=1)
-
-
-#%%
-# To get a little bit of overview. We want to transpose it, so that it's easier to be read
-sub_train_df.head().transpose()
-
-
-#%%
 # Create dummies for the relevant columns
-combined_df = pd.get_dummies(combined_df, columns=variables)
+combined_df = pd.get_dummies(combined_df, columns=variables, dummy_na=True, sparse=True)
 
 
 #%%
@@ -79,25 +71,26 @@ print("X_validation_set", X_validation_set.shape)
 
 #%%
 # Train a regression forest
-model = RandomForestRegressor(
-    n_estimators=400, max_features=0.3,
+model = RandomForestClassifier(
+    n_estimators=200, max_features=0.3,
     min_samples_leaf=20, n_jobs=-1, verbose=1)
 
 # Fit the forest based on the training data
 model.fit(X_train, y_train)
 
 # Predict based on the validation set
-preds_valid = model.predict(X_validation_set)
+preds_valid = model.predict_proba(X_validation_set)
 
+#%%
 # Get the probability of correctness and the mean squared error. 
 # The Roc_Auc score gives an estimation of what the final Kaggle score will be
-roc_auc_score(y_validation_set, preds_valid), mean_squared_error(y_validation_set, preds_valid) 
+roc_auc_score(y_validation_set, preds_valid[:,1]), mean_squared_error(y_validation_set, preds_valid[:,1]) 
 
 
 #%%
 # Just to get some more info, see how accurate the training set in the model is
 preds_train = model.predict(X_train)
-roc_auc_score(y_train, preds_train), mean_squared_error(y_train, preds_train)
+roc_auc_score(y_train, preds_train[:,1]), mean_squared_error(y_train, preds_train[:,1])
 
 
 #%%
@@ -112,11 +105,11 @@ sub_test_df = sub_test_df.drop('isFraud', axis=1)
 
 #%%
 # Predict based on the test data
-preds_test = model.predict(sub_test_df)
+preds_test = model.predict_proba(sub_test_df)
 
 
 #%%
 # Create the hand in CSV file
 hand_in_sample = pd.read_csv('./data/sample_submission.csv')
-hand_in_sample['isFraud'] = preds_test
+hand_in_sample['isFraud'] = preds_test[:,1]
 hand_in_sample.to_csv('./data/hand_in_submission.csv', index=False)
